@@ -24,7 +24,14 @@ async def on_message(message):
     if message.content.startswith('!status'):
         timeDelta = dt.datetime.now() - lastRefresh
         msg = "Online! Last price check was " + str(timeDelta.seconds / 60) + " minutes ago"
+        #TODO: fix this so that it rounds properly
         await message.channel.send(msg)
+    #TODO: make this be more universal (!price {symbol}), where symbol is either a crypto converted or a stock
+    # also make the message be "BTC: $56,900".
+    if message.content.startswith('!priceBTC'):
+        await message.channel.send(getPrice('BTC-USD'))
+    if message.content.startswith('!priceETH'):
+        await message.channel.send(getPrice('ETH-USD'))
     # Ideas for more commands:
     # help commander to list commands
     # timing to tell us how often it fetches new data
@@ -39,17 +46,8 @@ from discord.ext import commands, tasks
 @tasks.loop(seconds=60*mins)
 async def check_crypto_buy_tables():
 
-    start = dt.datetime.now() - timedelta(days = 1)
-    #print(start)
-    end = dt.datetime.now()
-
-    btc = web.DataReader('BTC-USD', 'yahoo', start, end)
-
-    #print(btc) # the price we want is today's "close".
-    btc_price = btc.iloc[len(btc)-1][3]
-
-    eth = web.DataReader('ETH-USD', 'yahoo', start, end)
-    eth_price = eth.iloc[len(eth)-1][3]
+    btc_price = getPrice('BTC-USD')
+    eth_price = getPrice('ETH-USD')
 
     # We will do the same for VTI and VOO in the future. For now, however, we will focus on Crypto.
     
@@ -86,30 +84,46 @@ async def check_crypto_buy_tables():
     # now, we iterate through each list and check the following things:
     # (1): is price greater than or equal to current price? 
     # (2): is fulfilled NO
+    #print("test", listOfBtcEntries)
     for x in listOfBtcEntries:
         if str(x[0]) ==  "nan":
-            break
+            continue
         new_x = x[0]
         new_x = new_x[1:].replace(",", "")
+        #print(new_x, btc_price, x[1])
         if float(new_x) >= float(btc_price) and x[1] == "NO":
             channel = client.get_channel(911349581667790889)
-            format_str = "BTC is currently at " + btc_price + ", which is below one of the table entry's price ceiling of " + x[0]
+            format_str = "BTC is currently at " + str(btc_price) + ", which is below one of the table entry's price ceiling of " + str(x[0])
             await channel.send(format_str)
 
     for x in listOfEthEntries:
         if str(x[0]) ==  "nan":
-            break
+            continue
         new_x = x[0]
         new_x = new_x[1:].replace(",", "")
         if float(new_x) >= float(eth_price) and x[1] == "NO":
             channel = client.get_channel(911349581667790889)
-            format_str = "ETH is currently at " + eth_price + ", which is below one of the table entry's price ceiling of " + x[0]
+            format_str = "ETH is currently at " + str(eth_price) + ", which is below one of the table entry's price ceiling of " + str(x[0])
             await channel.send(format_str)
     global lastRefresh
     lastRefresh = dt.datetime.now()
 
 #TODO ASAP: make a sell table version which should b super simple
 #we should make dummy data first though if we dont have the actual table made lol
+
+
+# works for BTC-USD and VOO
+def getPrice(asset_name):
+    start = dt.datetime.now() - timedelta(days = 1)
+    #print(start)
+    end = dt.datetime.now()
+    asset = web.DataReader(asset_name, 'yahoo', start, end)
+
+    #print(asset) # the price we want is today's "close".
+    price = asset.iloc[len(asset)-1][3]
+    #print(price)
+
+    return price
 
 @client.event 
 async def on_ready():
